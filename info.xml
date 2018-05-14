@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<extension key="com.github.ses" type="module">
+  <file>ses</file>
+  <name>Amazon SES (Simple Email Service)</name>
+  <description>This extension (for now) porcesses bounces from Amazon SES through Amazon SNS service.</description>
+  <license>AGPL-3.0</license>
+  <maintainer>
+    <author>Andrei Mondoc</author>
+    <email>andreimondoc@gmail.com</email>
+  </maintainer>
+  <urls>
+    <url desc="Main Extension Page">https://github.com/mecachisenros/com.github.com</url>
+    <url desc="Documentation">https://github.com/mecachisenros/com.github.com</url>
+    <url desc="Support">https://github.com/mecachisenros/com.github.com/issues</url>
+    <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
+  </urls>
+  <releaseDate>2018-04-30</releaseDate>
+  <version>0.1</version>
+  <develStage>alpha</develStage>
+  <compatibility>
+    <ver>4.7</ver>
+  </compatibility>
+  <comments>Ongoing development.</comments>
+  <civix>
+    <namespace>CRM/Ses</namespace>
+  </civix>
+</extension>
