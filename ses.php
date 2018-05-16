@@ -151,14 +151,14 @@ function ses_civicrm_preProcess($formName, &$form) {
  * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_navigationMenu
  *
  */
-/*function ses_civicrm_navigationMenu(&$menu) {
-  _ses_civix_insert_navigation_menu($menu, 'Mailings', array(
-    'label' => E::ts('New subliminal message'),
-    'name' => 'mailing_subliminal_message',
-    'url' => 'civicrm/mailing/subliminal',
-    'permission' => 'access CiviMail',
-    'operator' => 'OR',
+function ses_civicrm_navigationMenu(&$menu) {
+  _ses_civix_insert_navigation_menu($menu, 'Administer/CiviMail', array(
+    'label' => E::ts('AWS SES settings'),
+    'name' => 'ses_settings',
+    'url' => 'civicrm/ses/settings',
+    'permission' => 'access CiviMail, administer CiviCRM',
+    'operator' => 'AND',
     'separator' => 0,
   ));
   _ses_civix_navigationMenu($menu);
-} */
+}
