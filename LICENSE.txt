@@ -1,5 +1,5 @@
-Package: com.github.ses
-Copyright (C) 2018, Andrei Mondoc <andreimondoc@gmail.com>
+Package: ses
+Copyright (C) 2018, Your Name <you@example.com>
 Licensed under the GNU Affero Public License 3.0 (below).
 
 -------------------------------------------------------------------------------

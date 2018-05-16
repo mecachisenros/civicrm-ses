@@ -8,7 +8,7 @@
  */
 class CRM_Ses_ExtensionUtil {
   const SHORT_NAME = "ses";
-  const LONG_NAME = "com.github.ses";
+  const LONG_NAME = "ses";
   const CLASS_PREFIX = "CRM_Ses";
 
   /**
