@@ -118,6 +118,9 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 	 * Run.
 	 */
   	public function run() {
+
+  		// verify sns signature
+  		if ( ! $this->verify_signature() ) CRM_Utils_System::civiExit();
   		
   		// confirm subscription
   		if( $this->json->Type == 'SubscriptionConfirmation' ) $this->confirm_subscription();
@@ -236,5 +239,39 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 			curl_exec( $curl_handle );
 			curl_close( $curl_handle );
 		}
+	}
+
+	/**
+	 * Verify SNS Message signature.
+	 *
+	 * @see https://docs.aws.amazon.com/sns/latest/dg/SendMessageToHttp.verify.signature.html
+	 * @return bool $signed true if succesful
+	 */
+	protected function verify_signature() {
+
+		// keys needed for signature
+		$keys_to_sign = ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type'];
+		// for SubscriptionConfirmation the keys are slightly different
+		if ( $this->json->Type == 'SubscriptionConfirmation' )
+			$keys_to_sign = ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type'];
+
+		// build message to sign
+		foreach ( $keys_to_sign as $key ) {
+			if ( isset( $this->json->$key ) )
+				$message .= "{$key}\n{$this->json->$key}\n";
+		}
+
+		// decode SNS signature
+		$sns_signature = base64_decode( $this->json->Signature );
+		
+		// get certificate from SigningCerURL and extract public key
+		$public_key = openssl_get_publickey( file_get_contents( $this->json->SigningCertURL ) );
+		
+		// verify signature
+		$signed = openssl_verify( $message, $sns_signature, $public_key, OPENSSL_ALGO_SHA1 );
+
+		if ( $signed && $signed != -1 )
+			return true;
+		return false;
 	}
 }
