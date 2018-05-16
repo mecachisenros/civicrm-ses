@@ -161,10 +161,10 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   	 * Get verp items.
   	 *
   	 * @param string $header_value The X-CiviMail-Bounce header
-  	 * @return array $verp_itmes The verp items [ $job_id, $queue_id, $hash ]
+  	 * @return array $verp_items The verp items [ $job_id, $queue_id, $hash ]
   	 */
   	protected function get_verp_items( $header_value ) {
-  		$verp_itmes = substr( substr( $header_value, 0, strpos( $header_value, '@' ) ), 2 );
+  		$verp_items = substr( substr( $header_value, 0, strpos( $header_value, '@' ) ), 2 );
   		return explode( $this->verp_separator, $verp_items );
   	}
 
