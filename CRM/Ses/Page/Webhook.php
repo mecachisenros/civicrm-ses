@@ -17,6 +17,14 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 	protected $verp_separator;
 
 	/**
+	 * Localpart.
+	 *
+	 * @access protected
+	 * @var string $localpart
+	 */
+	protected $localpart;
+
+	/**
 	 * The SES Notification object.
 	 *
 	 * @access protected
@@ -92,6 +100,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 		}
 		
 		$this->verp_separator = Civi::settings()->get( 'verpSeparator' );
+		$this->localpart = CRM_Core_BAO_MailSettings::defaultLocalpart();
 		$this->civi_bounce_types = $this->get_civi_bounce_types();
 		// get json input
 		$this->json = json_decode( file_get_contents( 'php://input' ) );
@@ -153,7 +162,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   	 * @return array $verp_items The verp items [ $job_id, $queue_id, $hash ]
   	 */
   	protected function get_verp_items( $header_value ) {
-  		$verp_items = substr( substr( $header_value, 0, strpos( $header_value, '@' ) ), 2 );
+  		$verp_items = substr( substr( $header_value, 0, strpos( $header_value, '@' ) ), strlen( $this->localpart ) + 2 );
   		return explode( $this->verp_separator, $verp_items );
   	}
 
