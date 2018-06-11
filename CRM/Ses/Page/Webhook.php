@@ -64,19 +64,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 	 * @access protected 
 	 * @var array $civi_bounce_types
 	 */
-	protected $civi_bounce_types = [
-		1 => 'AOL',
-		2 => 'Away',
-		3 => 'Dns',
-		4 => 'Host',
-		5 => 'Inactive',
-		6 => 'Invalid',
-		7 => 'Loop',
-		8 => 'Quota',
-		9 => 'Relay',
-		10 => 'Spam',
-		11 => 'Syntax'
-	];
+	protected $civi_bounce_types = [];
 	
 	/**
 	 * Guzzle exists.
@@ -104,6 +92,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 		}
 		
 		$this->verp_separator = Civi::settings()->get( 'verpSeparator' );
+		$this->civi_bounce_types = $this->get_civi_bounce_types();
 		// get json input
 		$this->json = json_decode( file_get_contents( 'php://input' ) );
 		// message object
@@ -273,5 +262,24 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 		if ( $signed && $signed != -1 )
 			return true;
 		return false;
+	}
+
+	/**
+	 * Get CiviCRM bounce types.
+	 * 
+	 * @return $array $civi_bounce_types
+	 */
+	protected function get_civi_bounce_types() {
+		if ( ! empty( $this->civi_bounce_types ) ) return $this->civi_bounce_types;
+		
+		$query = 'SELECT id,name FROM civicrm_mailing_bounce_type';
+		$dao = CRM_Core_DAO::executeQuery( $query );
+		
+		$civi_bounce_types = [];
+		while ( $dao->fetch() ) {
+			$civi_bounce_types[$dao->id] = $dao->name;
+		}
+
+		return $civi_bounce_types;
 	}
 }
