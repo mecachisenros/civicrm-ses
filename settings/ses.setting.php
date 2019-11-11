@@ -8,7 +8,7 @@ return [
 		'quick_form_type' => 'Element',
 		'html_type' => 'Text',
 		'default' => false,
-		'title' => 'Amazon SES acceess key',
+		'title' => 'Amazon SES access key',
 		'is_domain' => 1,
 		'is_contact' => 0,
 		'description' => 'Access key description',
@@ -25,7 +25,7 @@ return [
 		'title' => 'Amazon SES secret key',
 		'is_domain' => 1,
 		'is_contact' => 0,
-		'description' => 'Cool descriptio for secret key',
+		'description' => 'Cool description for secret key',
 		'help_text' => 'Some help description',
 	],
 	'amazon_ses_region' => [

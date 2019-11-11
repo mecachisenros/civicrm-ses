@@ -134,24 +134,14 @@ function ses_civicrm_entityTypes(&$entityTypes) {
     _ses_civix_civicrm_entityTypes($entityTypes);
 }
 
-// --- Functions below this ship commented out. Uncomment as required. ---
-
-/**
- * Implements hook_civicrm_preProcess().
- *
- * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_preProcess
- *
-function ses_civicrm_preProcess($formName, &$form) {
-
-} // */
-
 /**
  * Implements hook_civicrm_navigationMenu().
  *
  * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_navigationMenu
  *
  */
-function ses_civicrm_navigationMenu(&$menu) {
+// Disable this for now because settings are never used
+/*function ses_civicrm_navigationMenu(&$menu) {
   _ses_civix_insert_navigation_menu($menu, 'Administer/CiviMail', array(
     'label' => E::ts('AWS SES settings'),
     'name' => 'ses_settings',
@@ -161,4 +151,4 @@ function ses_civicrm_navigationMenu(&$menu) {
     'separator' => 0,
   ));
   _ses_civix_navigationMenu($menu);
-}
+}*/
