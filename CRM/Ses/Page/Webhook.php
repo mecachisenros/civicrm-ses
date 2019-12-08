@@ -273,6 +273,8 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 
     if ($signed && $signed != -1)
       return true;
+
+    \Civi::log()->debug('AWS SNS signature verification failed!');
     return false;
   }
 
