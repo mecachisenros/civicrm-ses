@@ -125,8 +125,21 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 
     if (in_array($this->message->notificationType, ['Bounce'])) {
       // get verp items from X-CiviMail-Bounce header
-      list($job_id, $event_queue_id, $hash) = $this->get_verp_items($this->get_header_value('X-CiviMail-Bounce'));
+      // @fixme: MJW I don't think the X-CiviMail-Bounce works with SES because we don't get any headers returned.
+      //   So we should remove this first part and just use getVerpItemsFromSource.
+      $headerValue = $this->get_header_value('X-CiviMail-Bounce');
+      if ($headerValue) {
+        list($job_id, $event_queue_id, $hash) = $this->get_verp_items($headerValue);
+      }
+      else {
+        list($job_id, $event_queue_id, $hash) = $this->getVerpItemsFromSource();
+      }
 
+      if (empty($job_id) || empty($event_queue_id) || empty($hash)
+        || !CRM_Mailing_Event_BAO_Queue::verify($job_id, $event_queue_id, $hash)) {
+        \Civi::log()->error("Invalid or missing ID for mailing with source address {$this->message->mail->source}. job_id={$job_id},event_queue_id={$event_queue_id},hash={$hash}");
+        CRM_Utils_System::civiExit();
+      }
       $bounce_params = $this->set_bounce_type_params([
         'job_id' => $job_id,
         'event_queue_id' => $event_queue_id,
@@ -135,6 +148,9 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 
       if (CRM_Utils_Array::value('bounce_type_id' , $bounce_params)) {
         CRM_Mailing_Event_BAO_Bounce::create($bounce_params);
+      }
+      else {
+        \Civi::log()->debug("Unknown bounce type for mailing with params: " . print_r($bounce_params));
       }
     }
     CRM_Utils_System::civiExit();
@@ -151,6 +167,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
       if ($header->name == $name)
         return $header->value;
     }
+    return NULL;
   }
 
   /**
@@ -162,6 +179,16 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   protected function get_verp_items($header_value) {
     $verp_items = substr(substr($header_value, 0, strpos($header_value, '@')), strlen($this->localpart) + 2);
     return explode($this->verp_separator, $verp_items);
+  }
+
+  /**
+   * Get verp items from a source address in format eg. b.13.6.1d49c3d4f888d58a@example.org
+   *
+   * @return array $verpItems The verp items [ $job_id, $queue_id, $hash ]
+   */
+  protected function getVerpItemsFromSource(): array {
+    $verpItems = substr(substr($this->message->mail->source, 0, strpos($this->message->mail->source, '@')), strlen($this->localpart) + 2);
+    return explode($this->verp_separator, $verpItems);
   }
 
   /**
