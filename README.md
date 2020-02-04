@@ -1,6 +1,6 @@
 # ses
 
-This extension exposes a webhook page to process bounces from Amazon SES (Simple Email Service) 
+This extension exposes a webhook page to process bounces from Amazon SES (Simple Email Service)
 through Amazon SNS (Simple Notification Service) notifications.
 
 The extension is licensed under [AGPL-3.0](LICENSE.txt).
@@ -8,7 +8,7 @@ The extension is licensed under [AGPL-3.0](LICENSE.txt).
 ## Requirements
 
 * PHP v7.1+
-* CiviCRM 5.13+
+* CiviCRM 5.19+
 
 ## Installation
 
@@ -45,6 +45,8 @@ Webhook url:
 * UI to create Topic and Subscription without leaving CiviCRM
 * Send statistics, and reputation dashlets
 
+Also see: https://github.com/mecachisenros/aws which could replace this extension in the future.
+
 ## Known Issues
 
-None that I'm aware of, report here if you find any and **be aware that this extension is at an alpha stage**.
+None that I'm aware of, report here if you find any and **be aware that this extension is at a beta stage**.
