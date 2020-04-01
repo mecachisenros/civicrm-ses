@@ -123,35 +123,50 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 
     if ($this->json->Type != 'Notification') CRM_Utils_System::civiExit();
 
-    if (in_array($this->message->notificationType, ['Bounce'])) {
-      // get verp items from X-CiviMail-Bounce header
-      // @fixme: MJW I don't think the X-CiviMail-Bounce works with SES because we don't get any headers returned.
-      //   So we should remove this first part and just use getVerpItemsFromSource.
-      $headerValue = $this->get_header_value('X-CiviMail-Bounce');
-      if ($headerValue) {
-        list($job_id, $event_queue_id, $hash) = $this->get_verp_items($headerValue);
-      }
-      else {
-        list($job_id, $event_queue_id, $hash) = $this->getVerpItemsFromSource();
-      }
+    list($job_id, $event_queue_id, $hash) = $this->getVerpItemsFromSource();
+    if (empty($job_id) || empty($event_queue_id) || empty($hash)
+      || !CRM_Mailing_Event_BAO_Queue::verify($job_id, $event_queue_id, $hash)) {
+      \Civi::log()->error("Invalid or missing ID for mailing with source address {$this->message->mail->source}. job_id={$job_id},event_queue_id={$event_queue_id},hash={$hash}");
+      CRM_Utils_System::civiExit();
+    }
+    $bounce_params = [
+      'job_id' => $job_id,
+      'event_queue_id' => $event_queue_id,
+      'hash' => $hash,
+    ];
 
-      if (empty($job_id) || empty($event_queue_id) || empty($hash)
-        || !CRM_Mailing_Event_BAO_Queue::verify($job_id, $event_queue_id, $hash)) {
-        \Civi::log()->error("Invalid or missing ID for mailing with source address {$this->message->mail->source}. job_id={$job_id},event_queue_id={$event_queue_id},hash={$hash}");
-        CRM_Utils_System::civiExit();
-      }
-      $bounce_params = $this->set_bounce_type_params([
-        'job_id' => $job_id,
-        'event_queue_id' => $event_queue_id,
-        'hash' => $hash,
-      ]);
+    switch ($this->message->notificationType) {
+      case 'Bounce':
+        $bounce_params = $this->set_bounce_type_params($bounce_params);
+        if (empty($bounce_params['bounce_type_id'])) {
+          // We couldn't classify bounce type - let CiviCRM try!
+          $bounce_params['body'] = "Bounce Description: {$this->message->bounce->bounceType} {$this->message->bounce->bounceSubType}";
+          civicrm_api3('Mailing', 'event_bounce', $bounce_params);
+        }
+        else {
+          // We've classified the bounce type, record in CiviCRM
+          CRM_Mailing_Event_BAO_Bounce::create($bounce_params);
+        }
+        break;
 
-      if (CRM_Utils_Array::value('bounce_type_id' , $bounce_params)) {
+      case 'Complaint':
+        $bounce_params = $this->map_complaint_types($bounce_params, 'Spam');
+        // Opt out the contact and create entries for spam bounces (which only puts the email on hold).
+        // This is because the contact likely reported the email as spam as a way to unsubscribe.
+        // So opting out only the one email address instead of the contact risks getting any emails sent to their
+        // secondary addresses flagged as spam as well, which can hurt our spam score.
         CRM_Mailing_Event_BAO_Bounce::create($bounce_params);
-      }
-      else {
-        \Civi::log()->debug("Unknown bounce type for mailing with params: " . print_r($bounce_params));
-      }
+        $sql = "SELECT cc.id FROM civicrm_contact cc INNER JOIN civicrm_mailing_event_queue cmeq ON cmeq.contact_id = cc.id WHERE cmeq.id = %1";
+        $sql_params = [1 => [$bounce_params['event_queue_id'], 'Integer']];
+        $contact_id = CRM_Core_DAO::singleValueQuery($sql, $sql_params);
+
+        if (!empty($contact_id)) {
+          civicrm_api3('Contact', 'create', [
+            'id' => $contact_id,
+            'is_opt_out' => 1,
+          ]);
+        }
+        break;
     }
     CRM_Utils_System::civiExit();
   }
@@ -249,6 +264,29 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
       $bounce_params['bounce_reason'] = $recipient->status . ' => ' . $recipient->diagnosticCode;
 
     return $bounce_params;
+  }
+
+  /**
+   * Map Amazon complaint types to Civi bounce types.
+   *
+   * @param  array $params The params array
+   * @param  string $type_to_map_to Civi bounce type to map to
+   * @return array $bounce_params The params array
+   */
+  protected function map_complaint_types($params, $type_to_map_to = 'Spam') {
+    $params['bounce_type_id'] = array_search($type_to_map_to, $this->civi_bounce_types);
+    // it should be one recipient
+    foreach ($this->complaint->complainedRecipients as $recipient) {
+      $params['complain_recipients'][] = $recipient->emailAddress;
+    }
+    if (empty($this->complaint->complaintFeedbackType)) {
+      $params['bounce_reason'] = 'Message has been flagged as Spam by the recipient';
+    }
+    else {
+      $params['bounce_reason'] = $this->complaint->complaintFeedbackType . ' => ' . $this->complaint->userAgent;
+    }
+
+    return $params;
   }
 
   /**
