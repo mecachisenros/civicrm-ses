@@ -14,9 +14,9 @@
     <url desc="Support">https://github.com/mecachisenros/civicrm-ses</url>
     <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
   </urls>
-  <releaseDate>2019-12-20</releaseDate>
-  <version>0.3</version>
-  <develStage>beta</develStage>
+  <releaseDate>2020-04-03</releaseDate>
+  <version>0.4</version>
+  <develStage>stable</develStage>
   <compatibility>
     <ver>5.19</ver>
   </compatibility>
