@@ -75,13 +75,6 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   protected $civi_bounce_types = [];
 
   /**
-   * Guzzle exists.
-   *
-   * @var bool $is_guzzle
-   */
-  protected $is_guzzle = false;
-
-  /**
    * GuzzleHttp Clinet.
    *
    * @access public
@@ -93,10 +86,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
    * Constructor.
    */
   public function __construct() {
-    if (class_exists('GuzzleHttp\Client')) {
-      $this->is_guzzle = true;
-      $this->client = new GuzzleHttp\Client();
-    }
+    $this->client = new GuzzleHttp\Client();
 
     $this->verp_separator = Civi::settings()->get('verpSeparator');
     $this->localpart = CRM_Core_BAO_MailSettings::defaultLocalpart();
@@ -293,18 +283,8 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
    * Confirm SNS subscription to topic.
    */
   protected function confirm_subscription() {
-    if ($this->is_guzzle) {
-      // use guzzlehttp
-      $this->client->request('POST', $this->json->SubscribeURL);
-    }
-    else {
-      // use curl
-      $curl_handle = curl_init();
-      curl_setopt($curl_handle, CURLOPT_URL, $this->json->SubscribeURL);
-      curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
-      curl_exec($curl_handle);
-      curl_close($curl_handle);
-    }
+    // use guzzlehttp
+    $this->client->request('POST', $this->json->SubscribeURL);
   }
 
   /**
