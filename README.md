@@ -1,3 +1,5 @@
+# Moved to https://lab.civicrm.org/extensions/ses
+
 # Amazon SES Bounce/Complaint Handler
 
 This extension exposes a webhook page to process bounces and complaints from Amazon SES (Simple Email Service)
