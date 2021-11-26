@@ -5,11 +5,6 @@ through Amazon SNS (Simple Notification Service) notifications.
 
 The extension is licensed under [AGPL-3.0](LICENSE.txt).
 
-## Requirements
-
-* PHP v7.1+
-* CiviCRM 5.19+
-
 ## Installation
 
 See: https://docs.civicrm.org/sysadmin/en/latest/customize/extensions/#installing-a-new-extension
@@ -25,22 +20,20 @@ If the _Notification_ is a _SubscriptionConfirmation_ it automatically _subscrib
 
 #### Bounce
 
-If it's a Bounce, it maps SES' bounce type to Civi's bounce type.
+If it's a Bounce, it maps SES' bounce type to Civi's bounce type as follows:
 
-##### Hard bounce mapping
-
-| SES | CiviCRM |
-|---|---|
-| Undetermined | Syntax |
-| General, NoEmail, Suppressed | Invalid |
-
-##### Soft bounce mapping
-
-| SES | CiviCRM |
-|---|---|
-| General | Syntax |
-| MessageTooLarge, MailboxFull | Quota  |
-| ContentRejected, AttachmentRejected | Spam |
+```php
+    $sesBounceTypes['Undetermined']['Undetermined'] = 'Invalid';
+    $sesBounceTypes['Permanent']['General'] = 'Invalid';
+    $sesBounceTypes['Permanent']['NoEmail'] = 'Invalid';
+    $sesBounceTypes['Permanent']['Suppressed'] = 'Invalid';
+    $sesBounceTypes['Permanent']['OnAccountSuppressionList'] = 'Invalid';
+    $sesBounceTypes['Transient']['General'] = 'Relay';
+    $sesBounceTypes['Transient']['MailboxFull'] = 'Quota';
+    $sesBounceTypes['Transient']['MessageTooLarge'] = 'Relay';
+    $sesBounceTypes['Transient']['ContentRejected'] = 'Spam';
+    $sesBounceTypes['Transient']['AttachmentRejected'] = 'Spam';
+```
 
 #### Complaint
 
@@ -49,7 +42,6 @@ If the _Notification_ is a _Complaint_ it creates a bounce in CiviCRM of type **
 This is implemented in the same way as used by the coopsymbiotic fork of sparkpost: https://github.com/coopsymbiotic/sparkpost/blob/coopsymbiotic/CRM/Sparkpost/Page/callback.php#L151
 
 ### Additional Information
-
 
 Please see Amazon's [guide and documentation](https://docs.aws.amazon.com/ses/latest/DeveloperGuide/configure-sns-notifications.html) on how to setup SNS notifications for SES.
 
@@ -64,4 +56,7 @@ Webhook url:
 * UI to create Topic and Subscription without leaving CiviCRM
 * Send statistics, and reputation dashlets
 
-Also see: https://github.com/mecachisenros/aws which could replace this extension in the future.
+#### See also:
+
+* AWS extension: https://github.com/mecachisenros/aws which could replace this extension in the future.
+* AirMail extension: https://github.com/aghstrategies/com.aghstrategies.airmail which is similar but handles bounces/complaints in CiviCRM slightly differently and doesn't verify webhook signatures.

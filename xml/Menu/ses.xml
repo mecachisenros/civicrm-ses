@@ -6,10 +6,4 @@
     <title>Amazon SES Webhook</title>
     <access_callback>1</access_callback>
   </item>
-  <item>
-    <path>civicrm/ses/settings</path>
-    <page_callback>CRM_Ses_Form_Settings</page_callback>
-    <title>Settings - Amazon SES</title>
-    <access_arguments>access CiviCRM</access_arguments>
-  </item>
 </menu>

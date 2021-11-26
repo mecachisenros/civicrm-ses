@@ -11,15 +11,13 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   /**
    * Verp Separator.
    *
-   * @access protected
    * @var string $verp_separator
    */
   protected $verp_separator;
 
   /**
-   * Localpart.
+   * CRM_Core_BAO_MailSettings::defaultLocalpart()
    *
-   * @access protected
    * @var string $localpart
    */
   protected $localpart;
@@ -27,60 +25,48 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   /**
    * The SES Notification object.
    *
-   * @access protected
-   * @var object $json
+   * @var object $snsEvent
    */
-  protected $json;
+  protected $snsEvent;
 
   /**
    * The SES Message object.
    *
-   * @access protected
-   * @var object $message
+   * @var object $snsEventMessage
    */
-  protected $message;
-
-  /**
-   * The SES Bounce object.
-   *
-   * @access protected
-   * @var object $bounce
-   */
-  protected $bounce;
-
-  /**
-   * SES Permanent bounce types.
-   *
-   * Hard bounces
-   * @access protected
-   * @var array $ses_permanent_bounce_types
-   */
-  protected $ses_permanent_bounce_types = ['Undetermined', 'General', 'NoEmail', 'Suppressed'];
-
-  /**
-   * SES Transient bounce types.
-   *
-   * Soft bounces
-   * @access protected
-   * @var array $ses_transient_bounce_types
-   */
-  protected $ses_transient_bounce_types = ['General', 'MailboxFull', 'MessageTooLarge', 'ContentRejected', 'AttachmentRejected'];
+  protected $snsEventMessage;
 
   /**
    * CiviCRM Bounce types.
    *
-   * @access protected
    * @var array $civi_bounce_types
    */
   protected $civi_bounce_types = [];
 
   /**
-   * GuzzleHttp Clinet.
+   * GuzzleHttp Client.
    *
-   * @access public
    * @var object $client Guzzle\Client
    */
   protected $client;
+
+  /**
+   * See https://docs.aws.amazon.com/ses/latest/DeveloperGuide/notification-contents.html#bounce-types
+   */
+  public function getBounceTypeId($bounceType, $bounceSubType) {
+    $sesBounceTypes['Undetermined']['Undetermined'] = 'Invalid';
+    $sesBounceTypes['Permanent']['General'] = 'Invalid';
+    $sesBounceTypes['Permanent']['NoEmail'] = 'Invalid';
+    $sesBounceTypes['Permanent']['Suppressed'] = 'Invalid';
+    $sesBounceTypes['Permanent']['OnAccountSuppressionList'] = 'Invalid';
+    $sesBounceTypes['Transient']['General'] = 'Relay';
+    $sesBounceTypes['Transient']['MailboxFull'] = 'Quota';
+    $sesBounceTypes['Transient']['MessageTooLarge'] = 'Relay';
+    $sesBounceTypes['Transient']['ContentRejected'] = 'Spam';
+    $sesBounceTypes['Transient']['AttachmentRejected'] = 'Spam';
+    $bounceTypeName = $sesBounceTypes[$bounceType][$bounceSubType];
+    return array_search($bounceTypeName, $this->civi_bounce_types);
+  }
 
   /**
    * Constructor.
@@ -92,31 +78,40 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
     $this->localpart = CRM_Core_BAO_MailSettings::defaultLocalpart();
     $this->civi_bounce_types = $this->get_civi_bounce_types();
     // get json input
-    $this->json = json_decode(file_get_contents('php://input'));
+    $this->snsEvent = json_decode(file_get_contents('php://input'));
     // message object
-    $this->message = json_decode($this->json->Message);
-    // bounce object
-    $this->bounce = $this->message->bounce;
+    $this->snsEventMessage = json_decode($this->snsEvent->Message);
 
     parent::__construct();
   }
 
   /**
-   * Run.
+   * @return void|null
+   * @throws \CiviCRM_API3_Exception
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function run() {
     // verify sns signature
     if (!$this->verify_signature()) CRM_Utils_System::civiExit();
 
-    // confirm subscription
-    if ($this->json->Type == 'SubscriptionConfirmation') $this->confirm_subscription();
+    switch ($this->snsEvent->Type) {
+      case 'SubscriptionConfirmation':
+        // Confirm the SNS subscription and exit
+        $this->confirm_subscription();
+        CRM_Utils_System::civiExit();
+        break;
 
-    if ($this->json->Type != 'Notification') CRM_Utils_System::civiExit();
+      case 'Notification':
+        break;
+
+      default:
+        CRM_Utils_System::civiExit();
+    }
 
     list($job_id, $event_queue_id, $hash) = $this->getVerpItemsFromSource();
     if (empty($job_id) || empty($event_queue_id) || empty($hash)
       || !CRM_Mailing_Event_BAO_Queue::verify($job_id, $event_queue_id, $hash)) {
-      \Civi::log()->error("Invalid or missing ID for mailing with source address {$this->message->mail->source}. job_id={$job_id},event_queue_id={$event_queue_id},hash={$hash}");
+      \Civi::log()->error("Invalid or missing ID for mailing with source address {$this->snsEventMessage->mail->source}. job_id={$job_id},event_queue_id={$event_queue_id},hash={$hash}");
       CRM_Utils_System::civiExit();
     }
     $bounce_params = [
@@ -125,12 +120,12 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
       'hash' => $hash,
     ];
 
-    switch ($this->message->notificationType) {
+    switch ($this->snsEventMessage->notificationType) {
       case 'Bounce':
         $bounce_params = $this->set_bounce_type_params($bounce_params);
         if (empty($bounce_params['bounce_type_id'])) {
           // We couldn't classify bounce type - let CiviCRM try!
-          $bounce_params['body'] = "Bounce Description: {$this->message->bounce->bounceType} {$this->message->bounce->bounceSubType}";
+          $bounce_params['body'] = "Bounce Description: {$this->snsEventMessage->bounce->bounceType} {$this->snsEventMessage->bounce->bounceSubType}";
           civicrm_api3('Mailing', 'event_bounce', $bounce_params);
         }
         else {
@@ -140,7 +135,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
         break;
 
       case 'Complaint':
-        $bounce_params = $this->map_complaint_types($bounce_params, 'Spam');
+        $bounce_params = $this->map_complaint_types($bounce_params);
         // Opt out the contact and create entries for spam bounces (which only puts the email on hold).
         // This is because the contact likely reported the email as spam as a way to unsubscribe.
         // So opting out only the one email address instead of the contact risks getting any emails sent to their
@@ -155,6 +150,7 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
             'id' => $contact_id,
             'is_opt_out' => 1,
           ]);
+          \Civi::log()->info('ses: Set is_opt_out for contactID: ' . $contact_id);
         }
         break;
     }
@@ -164,11 +160,12 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   /**
    * Get header by name.
    *
-   * @param  string $name The header name to retrieve
-   * @return string $value The header value
+   * @param string $name The header name to retrieve
+   *
+   * @return string The header value
    */
-  protected function get_header_value( $name ) {
-    foreach ($this->message->mail->headers as $key => $header) {
+  protected function get_header_value($name) {
+    foreach ($this->snsEventMessage->mail->headers as $header) {
       if ($header->name == $name)
         return $header->value;
     }
@@ -179,7 +176,8 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
    * Get verp items.
    *
    * @param string $header_value The X-CiviMail-Bounce header
-   * @return array $verp_items The verp items [ $job_id, $queue_id, $hash ]
+   *
+   * @return array The verp items [ $job_id, $queue_id, $hash ]
    */
   protected function get_verp_items($header_value) {
     $verp_items = substr(substr($header_value, 0, strpos($header_value, '@')), strlen($this->localpart) + 2);
@@ -189,10 +187,10 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   /**
    * Get verp items from a source address in format eg. b.13.6.1d49c3d4f888d58a@example.org
    *
-   * @return array $verpItems The verp items [ $job_id, $queue_id, $hash ]
+   * @return array The verp items [ $job_id, $queue_id, $hash ]
    */
   protected function getVerpItemsFromSource(): array {
-    $verpItems = substr(substr($this->message->mail->source, 0, strpos($this->message->mail->source, '@')), strlen($this->localpart) + 2);
+    $verpItems = substr(substr($this->snsEventMessage->mail->source, 0, strpos($this->snsEventMessage->mail->source, '@')), strlen($this->localpart) + 2);
     return explode($this->verp_separator, $verpItems);
   }
 
@@ -200,58 +198,34 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
    * Set bounce type params.
    *
    * @param array $bounce_params The params array
-   * @return array $bounce_params Teh params array
+   *
+   * @return array The params array
    */
   protected function set_bounce_type_params($bounce_params) {
-    // hard bounces
-    if ($this->bounce->bounceType == 'Permanent' && in_array($this->bounce->bounceSubType, $this->ses_permanent_bounce_types))
-      switch ($this->bounce->bounceSubType) {
-        case 'Undetermined':
-          $bounce_params = $this->map_bounce_types($bounce_params, 'Syntax');
-          break;
+    $bounce_params['bounce_type_id'] = $this->getBounceTypeId($this->snsEventMessage->bounce->bounceType, $this->snsEventMessage->bounce->bounceSubType);
 
-        case 'General':
-        case 'NoEmail':
-        case 'Suppressed':
-          $bounce_params = $this->map_bounce_types($bounce_params, 'Invalid');
-          break;
-
+    $reasonParts = [];
+    $reasonParts[] = $this->snsEventMessage->bounce->bounceType;
+    $reasonParts[] = $this->snsEventMessage->bounce->bounceSubType;
+    foreach ($this->snsEventMessage->bounce->bouncedRecipients as $recipient) {
+      $recipientReason = '';
+      if (!empty($recipient->emailAddress)) {
+        $recipientReason .= "email:{$recipient->emailAddress};";
       }
-    // soft bounces
-    if ($this->bounce->bounceType == 'Transient' && in_array($this->bounce->bounceSubType, $this->ses_transient_bounce_types)) {
-      switch ($this->bounce->bounceSubType) {
-        case 'General':
-          $bounce_params = $this->map_bounce_types($bounce_params, 'Syntax'); // hold_threshold is 3
-          break;
-
-        case 'MessageTooLarge':
-        case 'MailboxFull':
-          $bounce_params = $this->map_bounce_types($bounce_params, 'Quota');
-          break;
-
-        case 'ContentRejected':
-        case 'AttachmentRejected':
-          $bounce_params = $this->map_bounce_types($bounce_params, 'Spam');
-          break;
-
+      if (!empty($recipient->action)) {
+        $recipientReason .= "action:{$recipient->action};";
+      }
+      if (!empty($recipient->status)) {
+        $recipientReason .= "status:{$recipient->status};";
+      }
+      if (!empty($recipient->diagnosticCode)) {
+        $recipientReason .= "status:{$recipient->diagnosticCode};";
+      }
+      if (!empty($recipientReason)) {
+        $reasonParts[] = "[$recipientReason]";
       }
     }
-    return $bounce_params;
-  }
-
-  /**
-   * Map Amazon bounce types to Civi bounce types.
-   *
-   * @param  array $bounce_params The params array
-   * @param  string $type_to_map_to Civi bounce type to map to
-   * @return array $bounce_params The params array
-   */
-  protected function map_bounce_types($bounce_params, $type_to_map_to) {
-    $bounce_params['bounce_type_id'] = array_search($type_to_map_to, $this->civi_bounce_types);
-    // it should be one recipient
-    $recipient = count($this->bounce->bouncedRecipients) == 1 ? reset($this->bounce->bouncedRecipients) : false;
-    if ($recipient)
-      $bounce_params['bounce_reason'] = $recipient->status . ' => ' . $recipient->diagnosticCode;
+    $bounce_params['bounce_reason'] = "Bounce via SES: " . implode(" ", $reasonParts);
 
     return $bounce_params;
   }
@@ -259,21 +233,34 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
   /**
    * Map Amazon complaint types to Civi bounce types.
    *
-   * @param  array $params The params array
-   * @param  string $type_to_map_to Civi bounce type to map to
-   * @return array $bounce_params The params array
+   * @param array $params The params array
+   *
+   * @return array The params array
    */
-  protected function map_complaint_types($params, $type_to_map_to = 'Spam') {
-    $params['bounce_type_id'] = array_search($type_to_map_to, $this->civi_bounce_types);
-    // it should be one recipient
-    foreach ($this->complaint->complainedRecipients as $recipient) {
-      $params['complain_recipients'][] = $recipient->emailAddress;
+  protected function map_complaint_types($params) {
+    $params['bounce_type_id'] = array_search('Spam', $this->civi_bounce_types);
+
+    foreach ($this->snsEventMessage->complaint->complainedRecipients as $recipient) {
+      $recipientParts[] = $recipient->emailAddress;
     }
-    if (empty($this->complaint->complaintFeedbackType)) {
-      $params['bounce_reason'] = 'Message has been flagged as Spam by the recipient';
+
+    $reasonParts = [];
+    if (!empty($this->snsEventMessage->complaint->userAgent)) {
+      $reasonParts[] = $this->snsEventMessage->complaint->userAgent;
     }
-    else {
-      $params['bounce_reason'] = $this->complaint->complaintFeedbackType . ' => ' . $this->complaint->userAgent;
+    if (!empty($this->snsEventMessage->complaint->complaintFeedbackType)) {
+      $reasonParts[] = $this->snsEventMessage->complaint->complaintFeedbackType;
+    }
+    if (!empty($this->snsEventMessage->complaint->complaintSubType)) {
+      $reasonParts[] = $this->snsEventMessage->complaint->complaintSubType;
+    }
+    if (!empty($recipientParts)) {
+      $reasonParts[] = '[' . implode(";", $recipientParts) . ']';
+    }
+    if ($reasonParts) {
+      $params['bounce_reason'] = "Complaint via SES: " . implode(" ", $reasonParts);
+    } else {
+      $params['bounce_reason'] = "Complaint via SES (no further details)";
     }
 
     return $params;
@@ -281,55 +268,59 @@ class CRM_Ses_Page_Webhook extends CRM_Core_Page {
 
   /**
    * Confirm SNS subscription to topic.
+   *
+   * @see https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html#http-subscription-confirmation-json
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
   protected function confirm_subscription() {
-    // use guzzlehttp
-    $this->client->request('POST', $this->json->SubscribeURL);
+    // To confirm the subscription we must "visit" the provided SubscribeURL
+    $this->client->request('POST', $this->snsEvent->SubscribeURL);
+    \Civi::log()->info('ses: SNS subscription confirmed');
   }
 
   /**
    * Verify SNS Message signature.
    *
    * @see https://docs.aws.amazon.com/sns/latest/dg/SendMessageToHttp.verify.signature.html
-   * @return bool $signed true if succesful
+   * @return bool true if successful
    */
   protected function verify_signature() {
     // keys needed for signature
     $keys_to_sign = ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type'];
     // for SubscriptionConfirmation the keys are slightly different
-    if ($this->json->Type == 'SubscriptionConfirmation')
+    if ($this->snsEvent->Type == 'SubscriptionConfirmation')
       $keys_to_sign = ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type'];
 
     // build message to sign
     $message = '';
     foreach ($keys_to_sign as $key) {
-      if (isset($this->json->$key))
-        $message .= "{$key}\n{$this->json->$key}\n";
+      if (isset($this->snsEvent->$key))
+        $message .= "{$key}\n{$this->snsEvent->$key}\n";
     }
 
     // decode SNS signature
-    $sns_signature = base64_decode($this->json->Signature);
+    $sns_signature = base64_decode($this->snsEvent->Signature);
 
     // get certificate from SigningCerURL and extract public key
-    $public_key = openssl_get_publickey(file_get_contents($this->json->SigningCertURL));
+    $public_key = openssl_get_publickey(file_get_contents($this->snsEvent->SigningCertURL));
 
     // verify signature
     $signed = openssl_verify($message, $sns_signature, $public_key, OPENSSL_ALGO_SHA1);
 
     if ($signed && $signed != -1)
-      return true;
+      return TRUE;
 
-    \Civi::log()->debug('AWS SNS signature verification failed!');
-    return false;
+    \Civi::log()->error('ses: SNS signature verification failed!');
+    return FALSE;
   }
 
   /**
    * Get CiviCRM bounce types.
    *
-   * @return $array $civi_bounce_types
+   * @return array
    */
   protected function get_civi_bounce_types() {
-    if (!empty( $this->civi_bounce_types)) return $this->civi_bounce_types;
+    if (!empty($this->civi_bounce_types)) return $this->civi_bounce_types;
 
     $query = 'SELECT id,name FROM civicrm_mailing_bounce_type';
     $dao = CRM_Core_DAO::executeQuery($query);
