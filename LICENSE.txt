@@ -1,5 +1,5 @@
 Package: ses
-Copyright (C) 2019, Andrei Mondoc <andreimondoc@gmail.com>
+Copyright (C) 2021, Matthew Wire <mjw@mjwconsult.co.uk>
 Licensed under the GNU Affero Public License 3.0 (below).
 
 -------------------------------------------------------------------------------

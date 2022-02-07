@@ -5,20 +5,19 @@
   <description>This extension (for now) processes bounces from Amazon SES through Amazon SNS service.</description>
   <license>AGPL-3.0</license>
   <maintainer>
-    <author>Andrei Mondoc</author>
-    <email>andreimondoc@gmail.com</email>
+    <author>Matthew Wire, Andrei Mondoc</author>
+    <email>mjw@mjwconsult.co.uk, andreimondoc@gmail.com</email>
   </maintainer>
   <urls>
-    <url desc="Main Extension Page">https://github.com/mecachisenros/civicrm-ses</url>
-    <url desc="Documentation">https://github.com/mecachisenros/civicrm-ses</url>
-    <url desc="Support">https://github.com/mecachisenros/civicrm-ses</url>
+    <url desc="Main Extension Page">https://github.com/mjwconsult/civicrm-ses</url>
+    <url desc="Support">https://mjw.pt/support/ses</url>
     <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
   </urls>
-  <releaseDate>2019-12-20</releaseDate>
-  <version>0.3</version>
-  <develStage>beta</develStage>
+  <releaseDate>2021-11-25</releaseDate>
+  <version>1.1</version>
+  <develStage>stable</develStage>
   <compatibility>
-    <ver>5.19</ver>
+    <ver>5.35</ver>
   </compatibility>
   <civix>
     <namespace>CRM/Ses</namespace>
